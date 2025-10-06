@@ -1,8 +1,47 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gaming Event - Top Gun Gaming 2.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -13,7 +52,6 @@
             position: relative;
             min-height: 100vh;
             color: #e5e7eb;
-            font-family: 'Arial', sans-serif;
         }
         body::before {
             content: '';
@@ -47,134 +85,129 @@
         .hover-scale:hover {
             transform: scale(1.1);
         }
-        /* Blurred Navigation */
-        nav {
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            backdrop-filter: blur(10px);
-            background-color: rgba(20, 20, 20, 0.5);
-        }
-        /* Mobile Menu */
-        .menu-toggle {
-            display: none;
-            font-size: 2rem;
-            cursor: pointer;
-            z-index: 30;
-        }
-        .nav-menu {
-            display: flex;
-        }
-        .close-btn {
+        nav::before {
+            content: '';
             position: absolute;
-            top: 10px;
-            right: 10px;
-            font-size: 2rem;
-            cursor: pointer;
-            color: #e5e7eb;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backdrop-filter: blur(8px);
+            background-color: rgba(20, 20, 20, 0.9);
+            z-index: -1;
         }
-        @media (max-width: 768px) {
-            .menu-toggle {
-                display: block;
-            }
-            .nav-menu {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 250px;
-                height: 100%;
-                backdrop-filter: blur(10px);
-                background-color: rgba(20, 20, 20, 0.8);
-                padding-top: 60px;
-                flex-direction: column;
-                gap: 1rem;
-                z-index: 30;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease-in-out;
-            }
-            .nav-menu.active {
-                transform: translateX(0);
-            }
-            .nav-menu li {
-                padding: 1rem;
-            }
-            nav {
-                padding: 1rem;
-            }
-            .ml-auto {
-                margin-left: auto;
-            }
-            .mr-10 {
-                margin-right: 1rem;
-            }
-            h2 { font-size: 3rem; }
-            p { font-size: 2rem; }
-            h3 { font-size: 2.5rem; }
-            ul li { font-size: 1.5rem; }
-            img { width: 100%; max-width: 80%; }
-            .close-btn {
-                display: block;
-            }
+
+        /* NEW: Sliding Menu Styles from the left */
+        #mobile-menu {
+            position: fixed;
+            top: 0;
+            left: 0; 
+            height: 100%;
+            width: 75%; 
+            max-width: 300px; 
+            background-color: rgba(20, 20, 20, 0.85); 
+            backdrop-filter: blur(10px); 
+            transform: translateX(-100%); /* Start off-screen to the left */
+            transition: transform 0.4s ease-in-out;
+            z-index: 30; 
+            padding-top: 5rem;
+        }
+
+        #mobile-menu.open {
+            transform: translateX(0); 
+        }
+        
+        /* NEW: Overlay for background dimming */
+        #menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(3px); 
+            z-index: 25; 
+            display: none; 
+        }
+        #menu-overlay.open {
+            display: block;
         }
     </style>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const menuToggle = document.querySelector('.menu-toggle');
-            const navMenu = document.querySelector('.nav-menu');
-            const closeBtn = document.querySelector('.close-btn');
-            menuToggle.addEventListener('click', function() {
-                navMenu.classList.add('active');
-            });
-            closeBtn.addEventListener('click', function() {
-                navMenu.classList.remove('active');
-            });
-        });
-    </script>
 </head>
 <body class="font-sans">
-    <!-- Navigation -->
-    <nav class="p-6 sticky top-0 z-20 shadow-lg flex justify-between items-center border-b border-gray-800">
-        <div class="container mx-auto flex items-center">
-            <div class="menu-toggle">&#9776;</div>
-            <ul class="nav-menu flex space-x-12 ml-0">
+
+    <div id="menu-overlay" class=""></div>
+    
+    <nav class="p-6 sticky top-0 z-20 shadow-lg border-b border-gray-800 relative">
+        <div class="container mx-auto flex justify-between items-center">
+            
+            <button id="hamburger" class="md:hidden p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+            </button>
+
+            <div class="ml-auto md:ml-0 md:mr-10">
+                <img src="resources/logo.png" alt="Logo" class="h-20 md:h-28">
+            </div>
+
+            <ul id="nav-links" class="hidden md:flex space-x-12 ml-auto">
                 <li><a href="index.html" class="hover:text-blue-400 text-2xl transition duration-300 hover-scale">Home</a></li>
                 <li><a href="gaming.html" class="hover:text-blue-400 text-2xl transition duration-300 hover-scale active">Gaming Event</a></li>
                 <li><a href="sumo.html" class="hover:text-blue-400 text-2xl transition duration-300 hover-scale">Sumo Bot</a></li>
                 <li><a href="contact.html" class="hover:text-blue-400 text-2xl transition duration-300 hover-scale">Contact</a></li>
             </ul>
-            <div class="ml-auto mr-10">
-                <img src="resources/logo.png" alt="Logo" class="h-28">
-            </div>
+
         </div>
     </nav>
-    <div class="close-btn hidden">&times;</div>
 
-    <!-- Main Content -->
-    <main class="container mx-auto my-24 px-6 content">
-        <section class="mb-24 fade-in">
-            <h2 class="text-7xl font-bold mb-8 text-blue-200 drop-shadow-xl">Mobile Gaming Event</h2>
-            <p class="text-6xl mb-12 text-gray-300">In the mobile gaming event, each school can send four students (one squad) to compete. The featured game is BGMI (Battlegrounds Mobile), where players will engage in intense mobile battles. The event highlights participants' skills in strategy, quick decision-making. Players must communicate effectively and adapt to challenges during the game in order to succeed. It is a competitive and exciting opportunity for students to showcase their gaming talents, organized by Ryan International School, Vasant Kunj.</p>
-            <div class="flex justify-center mb-12">
-                <img src="resources/1.png" alt="Gaming Event" class="w-1/2 rounded-xl shadow-xl">
+    <ul id="mobile-menu" class="md:hidden flex flex-col items-start px-8 space-y-6">
+        <li><a href="index.html" class="hover:text-blue-400 text-xl transition duration-300 block py-2 w-full">Home</a></li>
+        <li><a href="gaming.html" class="hover:text-blue-400 text-xl transition duration-300 active block py-2 w-full">Gaming Event</a></li>
+        <li><a href="sumo.html" class="hover:text-blue-400 text-xl transition duration-300 block py-2 w-full">Sumo Bot</a></li>
+        <li><a href="contact.html" class="hover:text-blue-400 text-xl transition duration-300 block py-2 w-full">Contact</a></li>
+    </ul>
+
+    <main class="container mx-auto my-12 md:my-24 px-6 content">
+        <section class="mb-12 md:mb-24 fade-in">
+            <h2 class="text-4xl md:text-7xl font-bold mb-4 md:mb-8 text-blue-200 drop-shadow-xl">Mobile Gaming Event</h2>
+            <p class="text-xl md:text-6xl mb-8 md:mb-12 text-gray-300">In the mobile gaming event, each school can send four students (one squad) to compete. The featured game is BGMI (Battlegrounds Mobile), where players will engage in intense mobile battles. The event highlights participants' skills in strategy, quick decision-making. Players must communicate effectively and adapt to challenges during the game in order to succeed. It is a competitive and exciting opportunity for students to showcase their gaming talents, organized by Ryan International School, Vasant Kunj.</p>
+            <div class="flex justify-center mb-8 md:mb-12">
+                <img src="resources/1.png" alt="Gaming Event" class="w-full md:w-1/2 rounded-xl shadow-xl">
             </div>
-            <h3 class="text-7xl font-semibold mb-6 text-blue-300">Event Rules and Guidelines</h3>
-            <ul class="list-disc pl-8 text-gray-400 mb-12 space-y-6">
-                <li class="text-5xl">Cheating, hacking, or exploiting game mechanics is strictly prohibited.</li>
-                <li class="text-5xl">Allowed devices: mobile phones, tablets, headsets, earbuds.</li>
-                <li class="text-5xl">Prohibited items: finger gloves, laptops, triggers, or any external device enhancing gameplay.</li>
-                <li class="text-5xl">Participants must ensure their equipment is functional. Maintain clear and respectful communication.</li>
-                <li class="text-5xl">Technical/software issues are the participant's responsibility.</li>
-                <li class="text-5xl">Devices should be charged; no Wi-Fi will be provided, so bring your own data.</li>
-                <li class="text-5xl">Rule violations will lead to disqualification.</li>
+            <h3 class="text-4xl md:text-7xl font-semibold mb-4 md:mb-6 text-blue-300">Event Rules and Guidelines</h3>
+            <ul class="list-disc pl-8 text-gray-400 mb-12 space-y-4 md:space-y-6">
+                <li class="text-lg md:text-5xl">Cheating, hacking, or exploiting game mechanics is strictly prohibited.</li>
+                <li class="text-lg md:text-5xl">Allowed devices: mobile phones, tablets, headsets, earbuds.</li>
+                <li class="text-lg md:text-5xl">Prohibited items: finger gloves, laptops, triggers, or any external device enhancing gameplay.</li>
+                <li class="text-lg md:text-5xl">Participants must ensure their equipment is functional. Maintain clear and respectful communication.</li>
+                <li class="text-lg md:text-5xl">Technical/software issues are the participant's responsibility.</li>
+                <li class="text-lg md:text-5xl">Devices should be charged; no Wi-Fi will be provided, so bring your own data.</li>
+                <li class="text-lg md:text-5xl">Rule violations will lead to disqualification.</li>
             </ul>
-            <p class="text-6xl text-gray-400">Teacher Coordinator: Mr. Akash Kumar<br>Event Coordinator: Moksh Malik-987334571<br>Email: <a href="mailto:risvkconfluence@gmail.com" class="text-blue-400 hover:underline">risvkconfluence@gmail.com</a></p>
+            <p class="text-xl md:text-6xl text-gray-400">Teacher Coordinator: Mr. Akash Kumar<br>Event Coordinators: Moksh Malik-987334571<br>Email: <a href="mailto:risvkconfluence@gmail.com" class="text-blue-400 hover:underline">risvkconfluence@gmail.com</a></p>
         </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="p-6 text-center rounded-t-2xl shadow-lg border-t border-gray-800">
-        <p class="text-xl text-gray-400">&copy; 2025 Top Gun Gaming 2.0 & Sumo Bot. All rights reserved.</p>
+    <footer class="p-4 md:p-6 text-center rounded-t-2xl shadow-lg border-t border-gray-800">
+        <p class="text-sm md:text-xl text-gray-400">&copy; 2025 Top Gun Gaming 2.0 & Sumo Bot. All rights reserved.</p>
     </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hamburger = document.getElementById('hamburger');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuOverlay = document.getElementById('menu-overlay');
+
+            function toggleMenu() {
+                mobileMenu.classList.toggle('open');
+                menuOverlay.classList.toggle('open');
+                document.body.classList.toggle('overflow-hidden');
+            }
+
+            hamburger.addEventListener('click', toggleMenu);
+            menuOverlay.addEventListener('click', toggleMenu); 
+        });
+    </script>
 </body>
 </html>
